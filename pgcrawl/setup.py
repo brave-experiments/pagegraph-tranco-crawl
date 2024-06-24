@@ -3,8 +3,8 @@ import subprocess
 import sys
 from typing import Any
 
-from pgcrawl.logging import log, error
-from pgcrawl.consts import PG_CRAWL_GIT_URL, BRAVE_INSTALL_SCRIPT
+from pgcrawl.logging import log, log_error
+from pgcrawl import PG_CRAWL_GIT_URL, BRAVE_INSTALL_SCRIPT
 
 
 def mkdirs(dirs: list[pathlib.Path], quiet: bool = False) -> None:
@@ -25,7 +25,7 @@ def call(args: list[str], quiet: bool = False, **kwargs: Any) -> bool:
     if rs.returncode == 0:
         return True
     else:
-        error(rs.stderr)
+        log_error(rs.stderr)
         return False
 
 

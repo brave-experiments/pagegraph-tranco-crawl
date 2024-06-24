@@ -8,12 +8,13 @@ import csv
 import datetime
 import pathlib
 
+import pgcrawl
 from pgcrawl.setup import mkdirs
 from pgcrawl.logging import log
 
 
 PARSER = argparse.ArgumentParser(
-    prog="pagegraph-tranco-crawl dispatcher setup",
+    prog=f"{pgcrawl.NAME}: dispatch-setup",
     description="Sets up directory structure and other needed steps for the "
                 "script running and dispatching the crawl to clients.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)

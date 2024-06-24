@@ -4,11 +4,13 @@ import argparse
 import pathlib
 import sys
 
+import pgcrawl
+from pgcrawl.client import PAGEGRAPH_CRAWL_DIR, DIRS_TO_WRITE
 import pgcrawl.setup as PG_CRAWL_SETUP
 
 
 PARSER = argparse.ArgumentParser(
-    prog="pagegraph-tranco-crawl client setup",
+    prog=f"{pgcrawl.NAME}: client-setup",
     description="Sets up directory structure and other needed steps for the "
                 "clients running a pagegraph crawl.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -25,35 +27,10 @@ ARGS = PARSER.parse_args()
 
 QUIET = ARGS.quiet
 
-WORKSPACE_DIR = pathlib.Path("./workspace")
-
-CLIENT_DIR = WORKSPACE_DIR / "client"
-RECEIVED_DIR = CLIENT_DIR / "received"
-CRAWLING_START_DIR = CLIENT_DIR / "crawling-start"
-CRAWLING_ERROR_DIR = CLIENT_DIR / "crawling-error"
-AWS_START = CLIENT_DIR / "aws-start"
-AWS_ERROR_DIR = CLIENT_DIR / "aws-error"
-COMPLETE_DIR = CLIENT_DIR / "complete"
-ERROR_DIR = CLIENT_DIR / "error"
-
-DIRS_TO_WRITE = [
-    WORKSPACE_DIR,
-    CLIENT_DIR,
-    RECEIVED_DIR,
-    CRAWLING_START_DIR,
-    CRAWLING_ERROR_DIR,
-    AWS_START,
-    AWS_ERROR_DIR,
-    COMPLETE_DIR,
-    ERROR_DIR
-]
-
 PG_CRAWL_SETUP.mkdirs(DIRS_TO_WRITE, QUIET)
 if not PG_CRAWL_SETUP.check_for_brave_binary(ARGS.binary, QUIET):
     if not PG_CRAWL_SETUP.install_brave_binary(QUIET):
         sys.exit(1)
-
-PAGEGRAPH_CRAWL_DIR = CLIENT_DIR / "pagegraph-crawl"
 
 if not PG_CRAWL_SETUP.check_for_pagegraph_crawl(PAGEGRAPH_CRAWL_DIR, QUIET):
     if not PG_CRAWL_SETUP.clone_brave_crawl(PAGEGRAPH_CRAWL_DIR, QUIET):

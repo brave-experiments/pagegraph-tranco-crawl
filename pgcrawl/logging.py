@@ -17,6 +17,6 @@ def log(msg: str | bytes, quiet: bool = False) -> None:
             print(text)
 
 
-def error(msg: str | bytes) -> None:
+def log_error(msg: str | bytes) -> None:
     if text := as_string(msg):
         print(text, file=sys.stderr)
