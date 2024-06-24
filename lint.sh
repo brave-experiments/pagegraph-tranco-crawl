@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-LOCAL_SCRIPTS="setup-client.py setup-dispatcher.py pgcrawl/*.py"
+LOCAL_SCRIPTS="client-setup.py dispatcher-setup.py dispatch.py pgcrawl/*.py"
 
 pycodestyle $LOCAL_SCRIPTS
 mypy --strict $LOCAL_SCRIPTS
