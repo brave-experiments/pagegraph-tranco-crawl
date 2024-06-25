@@ -1,0 +1,18 @@
+import pathlib
+
+
+WORKSPACE_DIR = pathlib.Path("./workspace")
+DISPATCHER_DIR = WORKSPACE_DIR / "dispatcher"
+DONE_DIR = DISPATCHER_DIR / "done"
+ERROR_DIR = DISPATCHER_DIR / "error"
+TODO_DIR = DISPATCHER_DIR / "todo"
+UNDERWAY_DIR = DISPATCHER_DIR / "underway"
+
+ALL_DIRS = [
+    WORKSPACE_DIR,
+    DISPATCHER_DIR,
+    DONE_DIR,
+    ERROR_DIR,
+    TODO_DIR,
+    UNDERWAY_DIR
+]

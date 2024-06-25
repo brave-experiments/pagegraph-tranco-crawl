@@ -9,6 +9,7 @@ import datetime
 import pathlib
 
 import pgcrawl
+from pgcrawl.dispatch import ALL_DIRS, TODO_DIR
 from pgcrawl.setup import mkdirs
 from pgcrawl.logging import log
 
@@ -34,16 +35,8 @@ PARSER.add_argument(
 
 ARGS = PARSER.parse_args()
 
-WORKSPACE_DIR = pathlib.Path("./workspace")
-DISPATCHER_DIR = WORKSPACE_DIR / "dispatcher"
-DONE_DIR = DISPATCHER_DIR / "done"
-TODO_DIR = DISPATCHER_DIR / "todo"
-UNDERWAY_DIR = DISPATCHER_DIR / "underway"
 
-ALL_DIRS_TO_CHECK = [
-    WORKSPACE_DIR, DISPATCHER_DIR, DONE_DIR, TODO_DIR, UNDERWAY_DIR]
-
-mkdirs(ALL_DIRS_TO_CHECK, ARGS.quiet)
+mkdirs(ALL_DIRS, ARGS.quiet)
 
 with open(ARGS.filename, 'r') as csvfile:
     reader = csv.reader(csvfile)
