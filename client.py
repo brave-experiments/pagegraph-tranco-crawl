@@ -4,11 +4,12 @@ import argparse
 import sys
 
 import pgcrawl
-from pgcrawl.client import BINARY_PATH, CrawlRequest, go
+from pgcrawl import BINARY_PATH, NAME
+from pgcrawl.client import CrawlRequest, go
 
 
 PARSER = argparse.ArgumentParser(
-    prog=f"{pgcrawl.NAME}: client",
+    prog=f"{NAME}: client",
     description="Script responsible for crawling a site, as dictated by a "
                 "dispatch instance of this script.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)

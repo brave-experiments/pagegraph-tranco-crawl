@@ -1,17 +1,36 @@
 #!/usr/bin/env python3
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 import ipaddress
-import multiprocessing
-import pathlib
 import sys
 import threading
-from typing import Any, Callable
 
-from pgcrawl import IPAddress, DEFAULT_CLIENT_CODE_PATH, NAME
-import pgcrawl.dispatch as PG_DISPATCH
+from pgcrawl import DEFAULT_CLIENT_CODE_PATH, NAME, S3_BUCKET, BINARY_PATH
+from pgcrawl.dispatch.commands import Action, client_setup, client_crawl
 from pgcrawl.logging import log, log_error
+from pgcrawl.types import IPAddress, UserName, WorkItem
+
+
+def client_setup_cmd(args: argparse.Namespace, ips: list[IPAddress]) -> None:
+    actions: list[Action] = []
+    if args.test_connection:
+        actions.append(Action.TEST_CONNECTION)
+    if args.delete_client_code:
+        actions.append(Action.DELETE_CLIENT_CODE)
+    if args.install_client_code:
+        actions.append(Action.INSTALL_CLIENT_CODE)
+    if args.check_client_code:
+        actions.append(Action.CHECK_CLIENT_CODE)
+    if args.setup_client_code:
+        actions.append(Action.SETUP_CLIENT_CODE)
+    return client_setup(actions, ips, args.user, args.client_path,
+                        args.timeout, args.quiet)
+
+
+def crawl_cmd(args: argparse.Namespace, ips: list[IPAddress]) -> None:
+    return client_crawl(ips, args.summarize, args.limit, args.user,
+                        args.binary, args.client_code_path, args.s3,
+                        args.sec, args.timeout, args.quiet)
 
 
 PARSER = argparse.ArgumentParser(
@@ -22,154 +41,126 @@ PARSER = argparse.ArgumentParser(
                 "scratch are: --test-connection, --install-client-code, "
                 "--check-client-code, --setup-client-code",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-PARSER.add_argument(
+
+SUBPARSERS = PARSER.add_subparsers(required=True)
+
+CLIENT_SETUP_PARSER = SUBPARSERS.add_parser(
+    "setup",
+    help="Validate, setup, configure, and otherwise prepare client servers.")
+CLIENT_SETUP_PARSER.add_argument(
     "ip",
     help="The IP addresses of clients to interact with.",
     nargs="+")
-PARSER.add_argument(
+CLIENT_SETUP_PARSER.add_argument(
     "--test-connection",
     default=False,
     action="store_true",
     help="Test connection to child server, but don't make any changes.")
-PARSER.add_argument(
+CLIENT_SETUP_PARSER.add_argument(
     "--delete-client-code",
     default=False,
     action="store_true",
     help="Install code at `--client-code-path` if present.")
-PARSER.add_argument(
+CLIENT_SETUP_PARSER.add_argument(
     "--install-client-code",
     default=False,
     action="store_true",
     help="Install this crawling code on child server.")
-PARSER.add_argument(
+CLIENT_SETUP_PARSER.add_argument(
     "--check-client-code",
     default=False,
     action="store_true",
     help="Check this crawling code is installed on child server, then quit.")
-PARSER.add_argument(
+CLIENT_SETUP_PARSER.add_argument(
     "--setup-client-code",
     default=False,
     action="store_true",
     help="Run the set up script for this code on the child server.")
-PARSER.add_argument(
+CLIENT_SETUP_PARSER.add_argument(
     "--full-setup",
     default=False,
     action="store_true",
     help="Run all commands needed to setup a client (i.e., --test-connection, "
          "--delete-client-code, --install-client-code, --check-client-code, "
          "--setup-client-code).")
-PARSER.add_argument(
+CLIENT_SETUP_PARSER.add_argument(
     "--client-code-path",
     default=DEFAULT_CLIENT_CODE_PATH,
     help="Path to where this code should be installed on the client.")
-PARSER.add_argument(
+CLIENT_SETUP_PARSER.add_argument(
     "-u", "--user",
     default="ubuntu",
+    type=UserName,
     help="The user to use when SSH'ing to a client server.")
-PARSER.add_argument(
-    "--crawl",
-    default=False,
-    action="store_true",
-    help="Crawl the given URL .")
-PARSER.add_argument(
+CLIENT_SETUP_PARSER.add_argument(
     "-t", "--timeout",
     default=120,
     type=int,
     help="Maximum number of seconds to wait on a client to do anything.")
-PARSER.add_argument(
+CLIENT_SETUP_PARSER.add_argument(
     "--quiet", "-q",
     default=False,
     action="store_true",
     help="Suppress non-error messages and logging.")
+CLIENT_SETUP_PARSER.set_defaults(func=client_setup_cmd)
 
-ARGS = PARSER.parse_args()
-QUIET = ARGS.quiet
-USER = ARGS.user
-CLIENT_PATH = ARGS.client_code_path
+CRAWL_PARSER = SUBPARSERS.add_parser(
+    "crawl",
+    help="Crawl URLs using child servers.")
+CRAWL_PARSER.add_argument(
+    "ip",
+    help="The IP addresses of clients to interact with.",
+    nargs="+")
+CRAWL_PARSER.add_argument(
+    "-s", "--summarize",
+    default=False,
+    action="store_true",
+    help="If passed, then don't make any changes, but summarize what would "
+         "be done.")
+CRAWL_PARSER.add_argument(
+    "--limit",
+    default=0,
+    type=int,
+    help="Number of URLs to crawl (over all the IP addresses given.) If 0, "
+         "then crawl without limit until all URLs are crawled.")
+CRAWL_PARSER.add_argument(
+    "--client-code-path",
+    default=DEFAULT_CLIENT_CODE_PATH,
+    help="Path to where this pagegraph-crawl is installed on the client.")
+PARSER.add_argument(
+    "--binary", "-b",
+    default=str(BINARY_PATH),
+    help="Path to the PageGraph enabled Brave binary for pagegraph-crawl.")
+PARSER.add_argument(
+    "--s3",
+    default=S3_BUCKET,
+    help="The S3 bucket to write the resulting graphs into.")
+CRAWL_PARSER.add_argument(
+    "-u", "--user",
+    default="ubuntu",
+    type=UserName,
+    help="The user to use when SSH'ing to a client server.")
+CRAWL_PARSER.add_argument(
+    "-s", "--sec",
+    type=int,
+    default=10,
+    help="Number of seconds let the page execute before requesting the graph.")
+CRAWL_PARSER.add_argument(
+    "-t", "--timeout",
+    default=120,
+    type=int,
+    help="Maximum number of seconds to wait on a client to do anything.")
+CRAWL_PARSER.add_argument(
+    "--quiet", "-q",
+    default=False,
+    action="store_true",
+    help="Suppress non-error messages and logging.")
+CRAWL_PARSER.set_defaults(func=crawl_cmd)
 
-IPS = [ipaddress.ip_address(x) for x in ARGS.ip]
-
-
-THREAD_IP_DICT: dict[threading.Thread, IPAddress] = {}
-
-
-def init_thread(ips: list[IPAddress]) -> None:
-    thread = threading.current_thread()
-    current_index = len(THREAD_IP_DICT)
-    THREAD_IP_DICT[thread] = ips[current_index]
-
-
-WorkItem = tuple[str, Callable[..., bool], list[Any]]
-
-
-def do_thread_work(work: WorkItem) -> tuple[IPAddress, bool]:
-    message, func, *args = work
-    thread = threading.current_thread()
-    ip_address = THREAD_IP_DICT[thread]
-    log(f"{ip_address}: {message}", QUIET)
-    return ip_address, func(ip_address, *args, timeout=ARGS.timeout,
-                            quiet=QUIET)
-
-
-def call_on_all(executor: ThreadPoolExecutor, message: str,
-                func: Callable[..., bool],
-                *args: list[Any]) -> dict[IPAddress, bool]:
-    log(message, QUIET)
-    results = {}
-    work_items = [(message, func, *args) for _ in IPS]
-    for ip, a_result in executor.map(do_thread_work, work_items):
-        results[ip] = a_result
-    log(f"Results: {results}", QUIET)
-    return results
-
-
-def all_successful(results: dict[IPAddress, bool]) -> bool:
-    for a_result in results.values():
-        if a_result is False:
-            return False
-    return True
-
-
-def exit_with_results(func_name: str, results: dict[IPAddress, bool]) -> None:
-    any_failures = False
-    for ip, a_result in results.items():
-        if a_result is False:
-            any_failures = True
-            log_error(f"Error: {ip}:{func_name}()")
-    if any_failures:
-        sys.exit(1)
-    sys.exit(0)
-
-
-with ThreadPoolExecutor(max_workers=len(IPS), initializer=init_thread,
-                        initargs=(IPS,)) as executor:
-    if ARGS.test_connection or ARGS.full_setup:
-        rs = call_on_all(executor, "Checking connections",
-                         PG_DISPATCH.test_connection, USER)
-        if not all_successful(rs):
-            exit_with_results("test_connection", rs)
-
-    if ARGS.delete_client_code or ARGS.full_setup:
-        rs = call_on_all(executor, f"Deleting client code from {CLIENT_PATH}",
-                         PG_DISPATCH.delete_client_code, USER, CLIENT_PATH)
-        if not all_successful(rs):
-            exit_with_results("delete_client_code", rs)
-
-    if ARGS.install_client_code or ARGS.full_setup:
-        rs = call_on_all(executor, f"Installing client code at {CLIENT_PATH}",
-                         PG_DISPATCH.install_client_code, USER, CLIENT_PATH)
-        if not all_successful(rs):
-            exit_with_results("install_client_code", rs)
-
-    if ARGS.check_client_code or ARGS.full_setup:
-        rs = call_on_all(
-            executor, f"Checking if client code is installed at {CLIENT_PATH}",
-            PG_DISPATCH.check_client_code, USER, CLIENT_PATH)
-        if not all_successful(rs):
-            exit_with_results("check_client_code", rs)
-
-    if ARGS.setup_client_code or ARGS.full_setup:
-        rs = call_on_all(executor, f"Setting up client code at {CLIENT_PATH}",
-                         PG_DISPATCH.setup_client_code, USER, CLIENT_PATH)
-        if not all_successful(rs):
-            exit_with_results("setup_client_code", rs)
+try:
+    ARGS = PARSER.parse_args()
+    IPS = [ipaddress.ip_address(x) for x in ARGS.ip]
+    RESULT = ARGS.func(ARGS, IPS)
+except ValueError as e:
+    print(f"Invalid argument: {e}", file=sys.stderr)
+    sys.exit(1)

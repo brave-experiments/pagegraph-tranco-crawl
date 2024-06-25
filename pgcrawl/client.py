@@ -10,8 +10,6 @@ import urllib.parse
 from pgcrawl.logging import log_error, log
 
 
-BINARY_PATH = Path("/opt/brave.com/brave-nightly/brave-browser-nightly")
-
 WORKSPACE_DIR = Path("./workspace")
 CLIENT_DIR = WORKSPACE_DIR / "client"
 
