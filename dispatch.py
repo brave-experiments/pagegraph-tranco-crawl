@@ -33,9 +33,11 @@ def client_setup_cmd(args: argparse.Namespace, ips: list[IPAddress]) -> None:
 def crawl_cmd(args: argparse.Namespace, ips: list[IPAddress]) -> None:
     client_crawl_args = ClientCrawlArgs(
         ARGS.binary_path, ARGS.client_code_path, ARGS.s3_bucket,
-        ARGS.pagegraph_secs, ARGS.timeout)
+        ARGS.pagegraph_secs, ARGS.client_timeout)
+    if args.limit < len(ips):
+        ips = ips[:args.limit]
     return client_crawl(ips, args.user, args.summarize, args.limit,
-                        client_crawl_args, args.quiet)
+                        client_crawl_args, ARGS.timeout, args.quiet)
 
 
 PARSER = argparse.ArgumentParser(

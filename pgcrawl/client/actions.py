@@ -64,8 +64,9 @@ def crawl(req: UrlRequest, output_path: Path, binary_path: str,
     stderr_stream = StringIO()
     is_success = False
     try:
-        write_log(CRAWLING_START_DIR, req, " ".join(crawl_args))
-        log(f" - {" ".join(crawl_args)}", quiet)
+        args_combined = " ".join(crawl_args)
+        write_log(CRAWLING_START_DIR, req, args_combined)
+        log(" - " + args_combined, quiet)
         rs = Popen(crawl_args, stdout=PIPE, stderr=PIPE,
                    preexec_fn=os.setsid, cwd=PAGEGRAPH_CRAWL_DIR)
         rs.wait(timeout=timeout)
@@ -100,7 +101,7 @@ def crawl(req: UrlRequest, output_path: Path, binary_path: str,
 def write_to_s3(req: UrlRequest, graph_path: Path, s3_bucket: str,
                 quiet: bool) -> bool:
     s3_url = f"s3://brave-research-crawling/{req.graph_name()}"
-    aws_args = ["aws", "s3", "mv", str(graph_path), s3_url]
+    aws_args = ["aws", "s3", "mv", "--quiet", str(graph_path), s3_url]
 
     is_success = False
     stdout_message = ""

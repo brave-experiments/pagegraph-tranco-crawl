@@ -111,24 +111,27 @@ def setup_client_code(server: ClientServer,
     return True
 
 
-def crawl(server: ClientServer, domain: TrancoDomain, secs: int, timeout: int,
-          binary_path: str, client_path: str, s3_bucket: str,
-          quiet: bool) -> bool:
+def crawl_with_client_server(server: ClientServer, domain: TrancoDomain,
+                             client_code_path: str, binary_path: str,
+                             pagegraph_secs: int, s3_bucket: str,
+                             client_timeout: int, timeout: int,
+                             quiet: bool) -> bool:
     conn = server.connection()
     log(f"-  attempting to crawl {domain.url} with {server.desc()}.", quiet)
-    crawl_cmd = activate_env_cmd_str(client_path)
+    crawl_cmd = activate_env_cmd_str(client_code_path)
     crawl_cmd += " && " + " ".join([
         "./client.py",
         "--rank", str(domain.rank),
         "--url", domain.url(),
-        "--sec", str(secs),
-        "--max", str(timeout),
-        "--binary", binary_path,
-        "--s3", s3_bucket
+        "--seconds", str(pagegraph_secs),
+        "--timeout", str(client_timeout),
+        "--client-code-path", client_code_path,
+        "--binary-path", binary_path,
+        "--s3-bucket", s3_bucket
     ])
     if quiet:
-        crawl_cmd += "--quiet"
-    rs = run_ssh_cmd(conn, crawl_cmd, timeout + 5, quiet)
+        crawl_cmd += " --quiet"
+    rs = run_ssh_cmd(conn, crawl_cmd, timeout, quiet)
     if not rs:
         conn.close()
         log("!  but an error occurred!", quiet)
