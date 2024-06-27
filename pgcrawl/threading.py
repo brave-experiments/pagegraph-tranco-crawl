@@ -1,8 +1,10 @@
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, Future, as_completed
 import sys
 import threading
+from typing import Iterable
 
 from pgcrawl.types import ClientServer, IPAddress, UserName, WorkItem
+from pgcrawl.types import WorkResponse
 from pgcrawl.logging import log, log_error
 
 
@@ -26,40 +28,59 @@ class ThreadIPManager:
         self.mapping_dict[thread] = self.ip_addresses[current_index]
 
     def call_on_thread(self, work: WorkItem) -> tuple[IPAddress, bool]:
-        func, message, args = work
+        func = work.func
+        args = work.args
         thread = threading.current_thread()
         ip = self.mapping_dict[thread]
-        log(f"{ip}: {message}", self.quiet)
+        log(f"{ip}: {work.message}")
         server_desc = ClientServer(ip, self.user)
-        is_success = func(server_desc, *args, timeout=self.timeout,
-                          quiet=self.quiet)
+        try:
+            is_success = func(server_desc, *args, timeout=self.timeout,
+                              quiet=self.quiet)
+        except Exception as e:
+            is_success = False
+        finally:
+            server_desc.close()
         return ip, is_success
 
-    def call(self, executor: ThreadPoolExecutor,
-             work_item: WorkItem) -> dict[IPAddress, bool]:
-        results = {}
+    def call_on_each(self, executor: ThreadPoolExecutor,
+                     work_item: WorkItem) -> list[WorkResponse]:
         work_items = [work_item for _ in self.ip_addresses]
-        for ip, a_result in executor.map(self.call_on_thread, work_items):
-            results[ip] = a_result
+        results = []
+        for work_response in self.call(executor, work_items):
+            results.append(work_response)
         return results
+
+    def call(self, executor: ThreadPoolExecutor,
+             work_items: list[WorkItem]) -> Iterable[WorkResponse]:
+        futures_map = {}
+        for work_item in work_items:
+            future = executor.submit(self.call_on_thread, work_item)
+            futures_map[future] = work_item
+
+        for a_future in as_completed(futures_map):
+            work_item = futures_map[a_future]
+            ip_address, was_success = a_future.result()
+            yield WorkResponse(ip_address, was_success, work_item)
 
     def num_workers(self) -> int:
         return len(self.ip_addresses)
 
 
-def exit_with_results(func_name: str, results: dict[IPAddress, bool]) -> None:
+def exit_with_results(func_name: str,
+                      results: list[WorkResponse]) -> None:
     any_failures = False
-    for ip, a_result in results.items():
-        if a_result is False:
+    for work_response in results:
+        if work_response.is_success is False:
             any_failures = True
-            log_error(f"Error: {ip}:{func_name}()")
+            log_error(f"Error: {work_response.ip}:{func_name}()")
     if any_failures:
         sys.exit(1)
     sys.exit(0)
 
 
-def is_all_successful(results: dict[IPAddress, bool]) -> bool:
-    for a_result in results.values():
-        if a_result is False:
+def is_all_successful(results: list[WorkResponse]) -> bool:
+    for work_response in results:
+        if work_response.is_success is False:
             return False
     return True

@@ -4,7 +4,6 @@ from ipaddress import ip_address
 from pathlib import Path
 import re
 
-from fabric import Connection
 from invoke.exceptions import CommandTimedOut
 
 from pgcrawl import GIT_URL
@@ -117,8 +116,9 @@ def crawl_with_client_server(server: ClientServer, domain: TrancoDomain,
                              client_timeout: int, timeout: int,
                              quiet: bool) -> bool:
     conn = server.connection()
-    log(f"-  attempting to crawl {domain.url} with {server.desc()}.", quiet)
-    crawl_cmd = activate_env_cmd_str(client_code_path)
+    log(f"-  attempting to crawl {domain.url()} with {server.desc()}.", quiet)
+    crawl_cmd = "killall -9 brave; sleep 3; "
+    crawl_cmd += activate_env_cmd_str(client_code_path)
     crawl_cmd += " && " + " ".join([
         "./client.py",
         "--rank", str(domain.rank),

@@ -101,7 +101,7 @@ def crawl(req: UrlRequest, output_path: Path, binary_path: str,
 def write_to_s3(req: UrlRequest, graph_path: Path, s3_bucket: str,
                 quiet: bool) -> bool:
     s3_url = f"s3://brave-research-crawling/{req.graph_name()}"
-    aws_args = ["aws", "s3", "mv", "--quiet", str(graph_path), s3_url]
+    aws_args = ["aws", "s3", "mv", "--no-progress", str(graph_path), s3_url]
 
     is_success = False
     stdout_message = ""
