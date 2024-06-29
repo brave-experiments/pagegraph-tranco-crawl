@@ -8,7 +8,7 @@ from typing import Optional
 from pgcrawl import DEFAULT_CLIENT_CODE_PATH, NAME
 from pgcrawl.client.args import ClientCrawlArgs, DEFAULT_ARGS
 from pgcrawl.dispatch.commands import Action, client_setup, client_crawl
-from pgcrawl.logging import log, log_error
+from pgcrawl.logging import add_logger_argument, Logger
 from pgcrawl.types import IPAddress, UserName, WorkItem
 
 
@@ -16,6 +16,8 @@ def client_setup_cmd(args: argparse.Namespace, ips: list[IPAddress]) -> None:
     actions: list[Action] = []
     if args.test_connection:
         actions.append(Action.TEST_CONNECTION)
+    if args.kill_child_processes:
+        actions.append(Action.KILL_CHILD_PROCESSES)
     if args.delete_client_code:
         actions.append(Action.DELETE_CLIENT_CODE)
     if args.install_client_code:
@@ -27,7 +29,7 @@ def client_setup_cmd(args: argparse.Namespace, ips: list[IPAddress]) -> None:
     if args.full_setup:
         actions.append(Action.ALL)
     return client_setup(actions, ips, args.user, args.client_code_path,
-                        args.timeout, args.quiet)
+                        args.timeout, Logger(args.log_level))
 
 
 def crawl_cmd(args: argparse.Namespace, ips: list[IPAddress]) -> None:
@@ -37,7 +39,8 @@ def crawl_cmd(args: argparse.Namespace, ips: list[IPAddress]) -> None:
     if args.limit != 0 and args.limit < len(ips):
         ips = ips[:args.limit]
     return client_crawl(ips, args.user, args.summarize, args.limit,
-                        client_crawl_args, ARGS.timeout, args.quiet)
+                        client_crawl_args, ARGS.timeout,
+                        Logger(args.log_level))
 
 
 PARSER = argparse.ArgumentParser(
@@ -65,6 +68,11 @@ CLIENT_SETUP_PARSER.add_argument(
     action="store_true",
     help="Test connection to child server, but don't make any changes.")
 CLIENT_SETUP_PARSER.add_argument(
+    "--kill-child-processes",
+    default=False,
+    action="store_true",
+    help="Kill relevant child processes on the child server.")
+CLIENT_SETUP_PARSER.add_argument(
     "--delete-client-code",
     default=False,
     action="store_true",
@@ -89,8 +97,8 @@ CLIENT_SETUP_PARSER.add_argument(
     default=False,
     action="store_true",
     help="Run all commands needed to setup a client (i.e., --test-connection, "
-         "--delete-client-code, --install-client-code, --check-client-code, "
-         "--setup-client-code).")
+         "--kill-child-processes, --delete-client-code, "
+         "--install-client-code, --check-client-code, --setup-client-code).")
 CLIENT_SETUP_PARSER.add_argument(
     "--client-code-path",
     default=DEFAULT_CLIENT_CODE_PATH,
@@ -105,11 +113,7 @@ CLIENT_SETUP_PARSER.add_argument(
     default=120,
     type=int,
     help="Maximum number of seconds to wait on a client to do anything.")
-CLIENT_SETUP_PARSER.add_argument(
-    "--quiet", "-q",
-    default=False,
-    action="store_true",
-    help="Suppress non-error messages and logging.")
+add_logger_argument(CLIENT_SETUP_PARSER)
 CLIENT_SETUP_PARSER.set_defaults(func=client_setup_cmd)
 
 CRAWL_PARSER = SUBPARSERS.add_parser(
@@ -164,11 +168,12 @@ CRAWL_PARSER.add_argument(
     default=DEFAULT_ARGS.timeout + 20,
     type=int,
     help="Maximum number of seconds overall to wait before quitting.")
+add_logger_argument(CRAWL_PARSER)
 CRAWL_PARSER.add_argument(
-    "--quiet", "-q",
+    "--silent",
     default=False,
     action="store_true",
-    help="Suppress non-error messages and logging.")
+    help="Suppress all messages and logging.")
 CRAWL_PARSER.set_defaults(func=crawl_cmd)
 
 try:

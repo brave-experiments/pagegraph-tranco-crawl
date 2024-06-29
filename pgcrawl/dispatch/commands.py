@@ -8,7 +8,8 @@ from pgcrawl.dispatch.actions import install_client_code, check_client_code
 from pgcrawl.dispatch.actions import setup_client_code, domains_to_crawl
 from pgcrawl.dispatch.actions import crawl_with_client_server
 from pgcrawl.dispatch.actions import record_as_complete, record_as_error
-from pgcrawl.logging import log, log_error
+from pgcrawl.dispatch.actions import kill_child_processes
+from pgcrawl.logging import Logger
 from pgcrawl.threading import ThreadIPManager, exit_with_results
 from pgcrawl.threading import is_all_successful
 from pgcrawl.types import IPAddress, UserName, WorkItem, TrancoDomain
@@ -16,6 +17,7 @@ from pgcrawl.types import IPAddress, UserName, WorkItem, TrancoDomain
 
 class Action(Enum):
     TEST_CONNECTION = auto()
+    KILL_CHILD_PROCESSES = auto()
     DELETE_CLIENT_CODE = auto()
     INSTALL_CLIENT_CODE = auto()
     CHECK_CLIENT_CODE = auto()
@@ -25,69 +27,76 @@ class Action(Enum):
 
 def client_setup(actions: list[Action], ips: list[IPAddress],
                  user: UserName, client_path: str, timeout: int,
-                 quiet: bool) -> None:
-    manager = ThreadIPManager(ips, user, timeout, quiet)
+                 logger: Logger) -> None:
+    manager = ThreadIPManager(ips, user, timeout, logger)
     do_all_actions = Action.ALL in actions
     with ThreadPoolExecutor(max_workers=manager.num_workers(),
                             initializer=manager.init_thread,) as executor:
         if Action.TEST_CONNECTION in actions or do_all_actions:
             message = "Checking connections"
-            log(message, quiet)
+            logger.info(message)
             work_item = WorkItem(test_connection, message, [])
             rs = manager.call_on_each(executor, work_item)
             if not is_all_successful(rs):
-                exit_with_results("test_connection", rs)
+                exit_with_results("test_connection", rs, logger)
+
+        if Action.KILL_CHILD_PROCESSES in actions or do_all_actions:
+            message = f"Killing child processes"
+            logger.info(message)
+            work_item = WorkItem(kill_child_processes, message, [])
+            rs = manager.call_on_each(executor, work_item)
+            if not is_all_successful(rs):
+                exit_with_results("kill_child_processes", rs, logger)
 
         if Action.DELETE_CLIENT_CODE in actions or do_all_actions:
             message = f"Deleting client code from {client_path}"
-            log(message, quiet)
+            logger.info(message)
             work_item = WorkItem(delete_client_code, message, [client_path])
             rs = manager.call_on_each(executor, work_item)
             if not is_all_successful(rs):
-                exit_with_results("delete_client_code", rs)
+                exit_with_results("delete_client_code", rs, logger)
 
         if Action.INSTALL_CLIENT_CODE in actions or do_all_actions:
             message = f"Installing client code at {client_path}"
-            log(message, quiet)
+            logger.info(message)
             work_item = WorkItem(install_client_code, message, [client_path])
             rs = manager.call_on_each(executor, work_item)
             if not is_all_successful(rs):
-                exit_with_results("install_client_code", rs)
+                exit_with_results("install_client_code", rs, logger)
 
         if Action.CHECK_CLIENT_CODE in actions or do_all_actions:
             message = f"Checking if client code is installed at {client_path}"
-            log(message, quiet)
+            logger.info(message)
             work_item = WorkItem(check_client_code, message, [client_path])
             rs = manager.call_on_each(executor, work_item)
             if not is_all_successful(rs):
-                exit_with_results("check_client_code", rs)
+                exit_with_results("check_client_code", rs, logger)
 
         if Action.SETUP_CLIENT_CODE in actions or do_all_actions:
             message = f"Setting up client code at {client_path}"
-            log(message, quiet)
+            logger.info(message)
             work_item = WorkItem(setup_client_code, message, [client_path])
             rs = manager.call_on_each(executor, work_item)
             if not is_all_successful(rs):
-                exit_with_results("setup_client_code", rs)
+                exit_with_results("setup_client_code", rs, logger)
 
 
 def client_crawl(ips: list[IPAddress], user: UserName, summarize: bool,
                  limit: int, client_crawl_args: ClientCrawlArgs,
-                 timeout: int, quiet: bool) -> None:
+                 timeout: int, logger: Logger) -> None:
     domains = domains_to_crawl()
     if limit > 0:
         domains = domains[:limit]
 
     if summarize:
-        log(f"Would crawl {len(domains)} domains with {len(ips)} servers",
-            False)
+        logger.info(f"Crawling {len(domains)} domains w/ {len(ips)} servers.")
         return
 
-    manager = ThreadIPManager(ips, user, timeout, quiet)
+    manager = ThreadIPManager(ips, user, timeout, logger)
     with ThreadPoolExecutor(max_workers=manager.num_workers(),
                             initializer=manager.init_thread,) as executor:
         message = f"Crawling {len(domains)} domains"
-        log(message, quiet)
+        logger.debug(message)
 
         work_items = []
 
@@ -110,9 +119,9 @@ def client_crawl(ips: list[IPAddress], user: UserName, summarize: bool,
             work_args = work_response.work_item.args
             tranco_record = cast(TrancoDomain, work_args[0])
             work_args_str = " ".join([str(x) for x in work_args])
-            if not work_response.is_success:
-                record_as_error(tranco_record)
-                log_error(str(work_response))
-            else:
+            if work_response.is_success:
                 record_as_complete(tranco_record)
-                log(str(work_response))
+                logger.info(str(work_response))
+            else:
+                record_as_error(tranco_record)
+                logger.error(str(work_response))

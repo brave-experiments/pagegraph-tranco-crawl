@@ -8,7 +8,7 @@ from invoke.exceptions import CommandTimedOut
 
 from pgcrawl import GIT_URL
 from pgcrawl.dispatch import TODO_DIR, UNDERWAY_DIR, DONE_DIR, ERROR_DIR
-from pgcrawl.logging import log, log_error
+from pgcrawl.logging import Logger
 from pgcrawl.subprocesses import run_ssh_cmd
 from pgcrawl.types import IPAddress, ClientServer, TrancoDomain, Url
 
@@ -25,54 +25,45 @@ def activate_env_cmd_str(client_path: str) -> str:
     return activate_env_cmd
 
 
-def test_connection(server: ClientServer, timeout: int = 10,
-                    quiet: bool = False) -> bool:
-    conn = server.connection()
+def test_connection(server: ClientServer, timeout: int,
+                    logger: Logger) -> bool:
     expected_user_dir = "/home/" + server.user
     test_cmd = f"test -d {expected_user_dir}"
-    if run_ssh_cmd(conn, test_cmd, timeout, quiet):
-        conn.close()
-        log("   connected successfully!", quiet)
+    if run_ssh_cmd(server, test_cmd, timeout, logger):
+        logger.debug("   connected successfully!")
         return True
     return False
 
 
 def check_client_code(server: ClientServer,
-                      client_path: str, timeout: int = 10,
-                      quiet: bool = False) -> bool:
-    conn = server.connection()
+                      client_path: str, timeout: int,
+                      logger: Logger) -> bool:
     check_install_cmd = f"test -d {client_path}"
-
-    rs = run_ssh_cmd(conn, check_install_cmd, timeout, quiet)
-    conn.close()
+    rs = run_ssh_cmd(server, check_install_cmd, timeout, logger)
     if rs:
-        log("   Looks already installed!", quiet)
+        logger.debug("   Looks already installed!")
         return True
     else:
-        log("   client code does not seem present", quiet)
+        logger.debug("   client code does not seem present",)
         return False
 
 
 def delete_client_code(server: ClientServer,
-                       client_path: str, timeout: int = 10,
-                       quiet: bool = False) -> bool:
-    conn = server.connection()
+                       client_path: str, timeout: int,
+                       logger: Logger) -> bool:
     delete_install = f"rm -Rf {client_path}"
-    rs = run_ssh_cmd(conn, delete_install, timeout, quiet)
-    conn.close()
+    rs = run_ssh_cmd(server, delete_install, timeout, logger)
     if rs:
-        log("   installed deleted!", quiet)
+        logger.debug("   installed deleted!")
         return True
     else:
-        log("   error when deleting", quiet)
+        logger.debug("   error when deleting")
         return False
 
 
 def install_client_code(server: ClientServer,
-                        client_path: str, timeout: int = 10,
-                        quiet: bool = False) -> bool:
-    conn = server.connection()
-
+                        client_path: str, timeout: int,
+                        logger: Logger) -> bool:
     intended_dest = Path(client_path).name
     commands = [
         f"python3 -m venv {intended_dest}",
@@ -83,29 +74,35 @@ def install_client_code(server: ClientServer,
         f"pip3 install -r requirements.txt"
     ]
     combined_cmd = " && ".join(commands)
-    rs = run_ssh_cmd(conn, combined_cmd, timeout, quiet)
-    conn.close()
+    rs = run_ssh_cmd(server, combined_cmd, timeout, logger)
     if rs:
-        log("   installed successfully!", quiet)
+        logger.debug("   installed successfully!")
         return True
     else:
-        log("   some error?", quiet)
+        logger.debug("   some error?")
         return False
 
 
 def setup_client_code(server: ClientServer,
-                      client_path: str, timeout: int = 10,
-                      quiet: bool = False) -> bool:
-    conn = server.connection()
-    log(f"-  attempting to setup project at {client_path}.", quiet)
+                      client_path: str, timeout: int,
+                      logger: Logger) -> bool:
+    logger.debug(f"-  attempting to setup project at {client_path}.")
     setup_cmd = activate_env_cmd_str(client_path)
-    setup_cmd += " && ./client-setup.py"
-    if quiet:
-        setup_cmd += " --quiet"
-    rs = run_ssh_cmd(conn, setup_cmd, timeout, quiet)
+    setup_cmd += " && ./client-setup.py " + logger.to_arg()
+    rs = run_ssh_cmd(server, setup_cmd, timeout, logger)
     if not rs:
-        conn.close()
-        log("!  but an error occurred!", quiet)
+        logger.debug("!  but an error occurred!")
+        return False
+    return True
+
+
+def kill_child_processes(server: ClientServer, timeout: int,
+                         logger: Logger) -> bool:
+    logger.debug(f"-  attempting to kill child processes.")
+    kill_cmd = "killall -9 brave; killall Xvfb;"
+    rs = run_ssh_cmd(server, kill_cmd, timeout, logger)
+    if not rs:
+        logger.debug("!  but an error occurred!")
         return False
     return True
 
@@ -114,10 +111,9 @@ def crawl_with_client_server(server: ClientServer, domain: TrancoDomain,
                              client_code_path: str, binary_path: str,
                              pagegraph_secs: int, s3_bucket: str,
                              client_timeout: int, timeout: int,
-                             quiet: bool) -> bool:
-    conn = server.connection()
-    log(f"-  attempting to crawl {domain.url()} with {server.desc()}.", quiet)
-    crawl_cmd = "killall -9 brave; sleep 3; "
+                             logger: Logger) -> bool:
+    logger.debug(f"-  crawling {domain.url()} with {server.desc()}.")
+    crawl_cmd = "killall -9 brave; killall Xvfb; sleep 3; "
     crawl_cmd += activate_env_cmd_str(client_code_path)
     crawl_cmd += " && " + " ".join([
         "./client.py",
@@ -129,12 +125,10 @@ def crawl_with_client_server(server: ClientServer, domain: TrancoDomain,
         "--binary-path", binary_path,
         "--s3-bucket", s3_bucket
     ])
-    if quiet:
-        crawl_cmd += " --quiet"
-    rs = run_ssh_cmd(conn, crawl_cmd, timeout, quiet)
+    crawl_cmd += logger.to_arg()
+    rs = run_ssh_cmd(server, crawl_cmd, timeout, logger)
     if not rs:
-        conn.close()
-        log("!  but an error occurred!", quiet)
+        logger.debug("!  but an error occurred!")
         return False
     return True
 

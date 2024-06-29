@@ -5,21 +5,21 @@ from typing import Iterable
 
 from pgcrawl.types import ClientServer, IPAddress, UserName, WorkItem
 from pgcrawl.types import WorkResponse
-from pgcrawl.logging import log, log_error
+from pgcrawl.logging import Logger
 
 
 class ThreadIPManager:
     ip_addresses: list[IPAddress]
     user: UserName
     timeout: int
-    quiet: bool
+    logger: Logger
     mapping_dict: dict[threading.Thread, IPAddress] = {}
 
     def __init__(self, ips: list[IPAddress], user: UserName, timeout: int,
-                 quiet: bool) -> None:
+                 logger: Logger) -> None:
         self.ip_addresses = ips
         self.user = user
-        self.quiet = quiet
+        self.logger = logger
         self.timeout = timeout
 
     def init_thread(self) -> None:
@@ -32,11 +32,11 @@ class ThreadIPManager:
         args = work.args
         thread = threading.current_thread()
         ip = self.mapping_dict[thread]
-        log(f"{ip}: {work.message}")
+        self.logger.info(f"({ip}) -> {work.message}")
         server_desc = ClientServer(ip, self.user)
         try:
             is_success = func(server_desc, *args, timeout=self.timeout,
-                              quiet=self.quiet)
+                              logger=self.logger)
         except Exception as e:
             is_success = False
         finally:
@@ -67,13 +67,13 @@ class ThreadIPManager:
         return len(self.ip_addresses)
 
 
-def exit_with_results(func_name: str,
-                      results: list[WorkResponse]) -> None:
+def exit_with_results(func_name: str, results: list[WorkResponse],
+                      logger: Logger) -> None:
     any_failures = False
     for work_response in results:
         if work_response.is_success is False:
             any_failures = True
-            log_error(f"Error: {work_response.ip}:{func_name}()")
+            logger.error(f"({work_response.ip}) -> {func_name}()")
     if any_failures:
         sys.exit(1)
     sys.exit(0)

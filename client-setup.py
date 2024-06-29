@@ -7,6 +7,7 @@ import sys
 import pgcrawl
 from pgcrawl.client import PAGEGRAPH_CRAWL_DIR, DIRS_TO_WRITE
 import pgcrawl.setup as PG_CRAWL_SETUP
+from pgcrawl.logging import add_logger_argument, Logger
 
 
 PARSER = argparse.ArgumentParser(
@@ -14,11 +15,7 @@ PARSER = argparse.ArgumentParser(
     description="Sets up directory structure and other needed steps for the "
                 "clients running a pagegraph crawl.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-PARSER.add_argument(
-    "--quiet", "-q",
-    default=False,
-    action="store_true",
-    help="Suppress non-error messages and logging.")
+add_logger_argument(PARSER)
 PARSER.add_argument(
     "--binary", "-b",
     default=None,
@@ -26,12 +23,13 @@ PARSER.add_argument(
 ARGS = PARSER.parse_args()
 
 QUIET = ARGS.quiet
+LOGGER = Logger(ARGS.log_level)
 
-PG_CRAWL_SETUP.mkdirs(DIRS_TO_WRITE, QUIET)
-if not PG_CRAWL_SETUP.check_for_brave_binary(ARGS.binary, QUIET):
-    if not PG_CRAWL_SETUP.install_brave_binary(QUIET):
+PG_CRAWL_SETUP.mkdirs(DIRS_TO_WRITE, LOGGER)
+if not PG_CRAWL_SETUP.check_for_brave_binary(ARGS.binary, LOGGER):
+    if not PG_CRAWL_SETUP.install_brave_binary(LOGGER):
         sys.exit(1)
 
-if not PG_CRAWL_SETUP.check_for_pagegraph_crawl(PAGEGRAPH_CRAWL_DIR, QUIET):
-    if not PG_CRAWL_SETUP.clone_brave_crawl(PAGEGRAPH_CRAWL_DIR, QUIET):
+if not PG_CRAWL_SETUP.check_for_pagegraph_crawl(PAGEGRAPH_CRAWL_DIR, LOGGER):
+    if not PG_CRAWL_SETUP.clone_brave_crawl(PAGEGRAPH_CRAWL_DIR, LOGGER):
         sys.exit(1)

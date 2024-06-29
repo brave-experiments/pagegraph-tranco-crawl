@@ -6,6 +6,7 @@ import sys
 import pgcrawl
 from pgcrawl.client.args import DEFAULT_ARGS, ClientCrawlArgs
 from pgcrawl.client.commands import crawl_url
+from pgcrawl.logging import add_logger_argument, Logger
 
 
 PARSER = argparse.ArgumentParser(
@@ -45,19 +46,16 @@ PARSER.add_argument(
     "--s3-bucket",
     default=DEFAULT_ARGS.s3_bucket,
     help="The S3 bucket to write the resulting graphs into.")
-PARSER.add_argument(
-    "--quiet", "-q",
-    default=False,
-    action="store_true",
-    help="Suppress non-error messages and logging.")
+add_logger_argument(PARSER)
 
 ARGS = PARSER.parse_args()
 QUIET = ARGS.quiet
+LOGGER = Logger(ARGS.log_level)
 
 CLIENT_CRAWL_ARGS = ClientCrawlArgs(ARGS.binary_path, ARGS.client_code_path,
                                     ARGS.s3_bucket, ARGS.seconds,
                                     ARGS.timeout)
-RESULT = crawl_url(ARGS.url, ARGS.rank, CLIENT_CRAWL_ARGS, QUIET)
+RESULT = crawl_url(ARGS.url, ARGS.rank, CLIENT_CRAWL_ARGS, LOGGER)
 
 if not RESULT:
     sys.exit(1)

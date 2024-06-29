@@ -6,6 +6,8 @@ from typing import Any, Callable, Optional
 
 from fabric import Connection
 
+from pgcrawl.logging import Logger
+
 
 Url = str
 UserName = str
@@ -29,9 +31,14 @@ class WorkResponse:
     is_success: bool
     work_item: WorkItem
 
+    def log(self, logger: Logger) -> None:
+        if self.is_success:
+            logger.info(self)
+        else:
+            logger.error(self)
+
     def __str__(self) -> str:
-        success_desc = "*success*" if self.is_success else "!fail!"
-        return f"{success_desc} {self.ip}:{self.work_item.desc()}"
+        return f"{self.ip} -> {self.work_item.desc()}"
 
 
 @dataclass

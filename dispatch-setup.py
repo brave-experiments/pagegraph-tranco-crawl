@@ -11,7 +11,7 @@ import pathlib
 import pgcrawl
 from pgcrawl.dispatch import ALL_DIRS, TODO_DIR
 from pgcrawl.setup import mkdirs
-from pgcrawl.logging import log
+from pgcrawl.logging import add_logger_argument, Logger
 
 
 PARSER = argparse.ArgumentParser(
@@ -27,14 +27,11 @@ PARSER.add_argument(
     type=int,
     default=15_000,
     help="Number of entries from the given file to write to into the queue.")
-PARSER.add_argument(
-    "--quiet", "-q",
-    default=False,
-    action="store_true",
-    help="Suppress non-error messages and logging.")
+add_logger_argument(PARSER)
+
 
 ARGS = PARSER.parse_args()
-
+LOGGER = Logger(ARGS.log_level)
 
 mkdirs(ALL_DIRS, ARGS.quiet)
 
@@ -45,7 +42,7 @@ with open(ARGS.filename, 'r') as csvfile:
         file_name = f"{rank}_{domain}"
         dest_file = TODO_DIR / file_name
         dest_file.write_text(str(datetime.datetime.now()))
-        log(f"{index} / {ARGS.num}: Wrote {dest_file}")
+        LOGGER.info(f"{index} / {ARGS.num}: Wrote {dest_file}")
         index += 1
         if index > ARGS.num:
             break

@@ -12,7 +12,7 @@ from pgcrawl.client import AWS_COMPLETE_DIR, AWS_ERROR_DIR, AWS_START_DIR
 from pgcrawl.client import CRAWLING_COMPLETE_DIR, CRAWLING_ERROR_DIR
 from pgcrawl.client import CRAWLING_START_DIR, PAGEGRAPH_CRAWL_DIR
 from pgcrawl.client import RECEIVED_DIR, TMP_DIR, ERROR_DIR, COMPLETE_DIR
-from pgcrawl.logging import log_error, log
+from pgcrawl.logging import Logger
 
 
 @dataclass
@@ -50,7 +50,7 @@ def write_log(dir_path: Path, req: UrlRequest,
 
 
 def crawl(req: UrlRequest, output_path: Path, binary_path: str,
-          pagegraph_time: int, timeout: int, quiet: bool) -> bool:
+          pagegraph_time: int, timeout: int, logger: Logger) -> bool:
     crawl_args = [
         "npm", "run", "crawl", "--",
         "-b", binary_path,
@@ -66,7 +66,7 @@ def crawl(req: UrlRequest, output_path: Path, binary_path: str,
     try:
         args_combined = " ".join(crawl_args)
         write_log(CRAWLING_START_DIR, req, args_combined)
-        log(" - " + args_combined, quiet)
+        logger.debug(" - " + args_combined)
         rs = Popen(crawl_args, stdout=PIPE, stderr=PIPE,
                    preexec_fn=os.setsid, cwd=PAGEGRAPH_CRAWL_DIR)
         rs.wait(timeout=timeout)
@@ -80,18 +80,18 @@ def crawl(req: UrlRequest, output_path: Path, binary_path: str,
         error_text = "Crawl timed out"
         os.killpg(os.getpgid(rs.pid), signal.SIGTERM)
 
-    log(f"crawl results:", quiet)
-    log(output_text, quiet)
+    logger.debug(f"crawl results:")
+    logger.debug(output_text)
 
     if not is_success:
         write_log(CRAWLING_ERROR_DIR, req, error_text)
-        log_error(error_text)
+        logger.error(error_text)
         return False
 
     if not output_path.is_file():
         error_message = f"No file at {str(output_path)}"
         write_log(CRAWLING_ERROR_DIR, req, error_message)
-        log_error(error_message)
+        logger.error(error_message)
         return False
 
     write_log(CRAWLING_COMPLETE_DIR, req, output_text)
@@ -99,7 +99,7 @@ def crawl(req: UrlRequest, output_path: Path, binary_path: str,
 
 
 def write_to_s3(req: UrlRequest, graph_path: Path, s3_bucket: str,
-                quiet: bool) -> bool:
+                logger: Logger) -> bool:
     s3_url = f"s3://brave-research-crawling/{req.graph_name()}"
     aws_args = ["aws", "s3", "mv", "--no-progress", str(graph_path), s3_url]
 
@@ -116,28 +116,28 @@ def write_to_s3(req: UrlRequest, graph_path: Path, s3_bucket: str,
         error_message = "request to aws timeout"
 
     if not is_success:
-        log_error(error_message)
+        logger.error(error_message)
         write_log(AWS_ERROR_DIR, req, error_message)
         return False
 
-    log(stdout_message, quiet)
+    logger.info(stdout_message)
     write_log(AWS_COMPLETE_DIR, req, stdout_message)
     return True
 
 
 def crawl_and_save(req: UrlRequest, output_path: Path, binary_path: str,
                    pagegraph_secs: int, s3_bucket: str, timeout: int,
-                   quiet: bool) -> bool:
-    log(f"1. Recording received {req.file_name()}", quiet)
+                   logger: Logger) -> bool:
+    logger.debug(f"1. Recording received {req.file_name()}")
 
-    log(f"2. Starting crawl of {req.url} to {str(output_path)}", quiet)
+    logger.debug(f"2. Starting crawl of {req.url} to {str(output_path)}")
     crawl_rs = crawl(req, output_path, binary_path, pagegraph_secs,
-                     timeout, quiet)
+                     timeout, logger)
     if not crawl_rs:
         return False
 
-    log(f"3. Writing results to S3")
-    s3_rs = write_to_s3(req, output_path, s3_bucket, quiet)
+    logger.debug(f"3. Writing results to S3")
+    s3_rs = write_to_s3(req, output_path, s3_bucket, logger)
     if not s3_rs:
         return False
 
@@ -146,11 +146,11 @@ def crawl_and_save(req: UrlRequest, output_path: Path, binary_path: str,
 
 def run(request: UrlRequest, binary_path: str,
         pagegraph_secs: int, s3_bucket: str, timeout: int,
-        quiet: bool) -> bool:
+        logger: Logger) -> bool:
     output_path = TMP_DIR / request.graph_name()
     write_log(RECEIVED_DIR, request)
     rs = crawl_and_save(request, output_path, binary_path,
-                        pagegraph_secs, s3_bucket, timeout, quiet)
+                        pagegraph_secs, s3_bucket, timeout, logger)
 
     if output_path.is_file():
         output_path.unlink()
