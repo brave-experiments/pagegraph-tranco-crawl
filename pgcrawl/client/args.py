@@ -1,9 +1,6 @@
 from dataclasses import dataclass
-from typing import Optional
-
 
 import pgcrawl
-from pgcrawl.types import Url
 
 
 @dataclass

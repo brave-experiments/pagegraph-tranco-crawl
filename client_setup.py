@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 
 import argparse
-import pathlib
 import sys
 
 import pgcrawl
-from pgcrawl.client import PAGEGRAPH_CRAWL_DIR, DIRS_TO_WRITE
+from pgcrawl.client import DIRS_TO_WRITE
 import pgcrawl.setup as PG_CRAWL_SETUP
 from pgcrawl.logging import add_logger_argument, Logger
 
@@ -30,6 +29,10 @@ if not PG_CRAWL_SETUP.check_for_brave_binary(ARGS.binary, LOGGER):
     if not PG_CRAWL_SETUP.install_brave_binary(LOGGER):
         sys.exit(1)
 
-if not PG_CRAWL_SETUP.check_for_pagegraph_crawl(PAGEGRAPH_CRAWL_DIR, LOGGER):
-    if not PG_CRAWL_SETUP.clone_brave_crawl(PAGEGRAPH_CRAWL_DIR, LOGGER):
+if not PG_CRAWL_SETUP.check_for_pagegraph_crawl(LOGGER):
+    if not PG_CRAWL_SETUP.clone_brave_crawl(LOGGER):
+        sys.exit(1)
+
+if not PG_CRAWL_SETUP.check_for_pagegraph_query(LOGGER):
+    if not PG_CRAWL_SETUP.clone_pagegraph_query(LOGGER):
         sys.exit(1)

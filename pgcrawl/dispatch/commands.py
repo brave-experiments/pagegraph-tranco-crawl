@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum, auto
-from typing import cast, Callable, Any
+from typing import cast
 
 from pgcrawl.client.args import ClientCrawlArgs
 from pgcrawl.dispatch.actions import test_connection, delete_client_code
@@ -41,7 +41,7 @@ def client_setup(actions: list[Action], ips: list[IPAddress],
                 exit_with_results("test_connection", rs, logger)
 
         if Action.KILL_CHILD_PROCESSES in actions or do_all_actions:
-            message = f"Killing child processes"
+            message = "Killing child processes"
             logger.info(message)
             work_item = WorkItem(kill_child_processes, message, [])
             rs = manager.call_on_each(executor, work_item)
@@ -95,13 +95,10 @@ def client_crawl(ips: list[IPAddress], user: UserName, summarize: bool,
     manager = ThreadIPManager(ips, user, timeout, logger)
     with ThreadPoolExecutor(max_workers=manager.num_workers(),
                             initializer=manager.init_thread,) as executor:
-        message = f"Crawling {len(domains)} domains"
-        logger.debug(message)
+        logger.debug(f"Crawling {len(domains)} domains")
 
         work_items = []
-
         for tranco_record in domains:
-            work_msg = f"Crawling {str(tranco_record)} domains"
             work_args = [
                 tranco_record,
                 client_crawl_args.client_code_path,
@@ -110,15 +107,14 @@ def client_crawl(ips: list[IPAddress], user: UserName, summarize: bool,
                 client_crawl_args.s3_bucket,
                 client_crawl_args.timeout
             ]
-            work_item = WorkItem(crawl_with_client_server, work_msg, work_args)
+            work_item = WorkItem(crawl_with_client_server,
+                                 f"Crawling {str(tranco_record)} domains",
+                                 work_args)
             work_items.append(work_item)
 
         for work_response in manager.call(executor, work_items):
-            ip = work_response.ip
-            func = work_response.work_item.func
             work_args = work_response.work_item.args
             tranco_record = cast(TrancoDomain, work_args[0])
-            work_args_str = " ".join([str(x) for x in work_args])
             if work_response.is_success:
                 record_as_complete(tranco_record)
                 logger.info(str(work_response))

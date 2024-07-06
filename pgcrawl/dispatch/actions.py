@@ -1,16 +1,10 @@
-from dataclasses import dataclass
-from io import StringIO
-from ipaddress import ip_address
 from pathlib import Path
-import re
-
-from invoke.exceptions import CommandTimedOut
 
 from pgcrawl import GIT_URL
 from pgcrawl.dispatch import TODO_DIR, UNDERWAY_DIR, DONE_DIR, ERROR_DIR
 from pgcrawl.logging import Logger
 from pgcrawl.subprocesses import run_ssh_cmd
-from pgcrawl.types import IPAddress, ClientServer, TrancoDomain, Url
+from pgcrawl.types import ClientServer, TrancoDomain
 
 
 def activate_env_cmd_str(client_path: str) -> str:
@@ -43,9 +37,8 @@ def check_client_code(server: ClientServer,
     if rs:
         logger.debug("   Looks already installed!")
         return True
-    else:
-        logger.debug("   client code does not seem present",)
-        return False
+    logger.debug("   client code does not seem present",)
+    return False
 
 
 def delete_client_code(server: ClientServer,
@@ -56,9 +49,8 @@ def delete_client_code(server: ClientServer,
     if rs:
         logger.debug("   installed deleted!")
         return True
-    else:
-        logger.debug("   error when deleting")
-        return False
+    logger.debug("   error when deleting")
+    return False
 
 
 def install_client_code(server: ClientServer,
@@ -68,19 +60,18 @@ def install_client_code(server: ClientServer,
     commands = [
         f"python3 -m venv {intended_dest}",
         f"cd {intended_dest}",
-        f". ./bin/activate",
+        ". ./bin/activate",
         f"git clone {GIT_URL} {intended_dest}",
         f"cd ./{intended_dest}",
-        f"pip3 install -r requirements.txt"
+        "pip3 install -r requirements.txt"
     ]
     combined_cmd = " && ".join(commands)
     rs = run_ssh_cmd(server, combined_cmd, timeout, logger)
     if rs:
         logger.debug("   installed successfully!")
         return True
-    else:
-        logger.debug("   some error?")
-        return False
+    logger.debug("   some error?")
+    return False
 
 
 def setup_client_code(server: ClientServer,
@@ -88,7 +79,7 @@ def setup_client_code(server: ClientServer,
                       logger: Logger) -> bool:
     logger.debug(f"-  attempting to setup project at {client_path}.")
     setup_cmd = activate_env_cmd_str(client_path)
-    setup_cmd += " && ./client-setup.py " + logger.to_arg()
+    setup_cmd += " && ./client_setup.py " + logger.to_arg()
     rs = run_ssh_cmd(server, setup_cmd, timeout, logger)
     if not rs:
         logger.debug("!  but an error occurred!")
@@ -98,7 +89,7 @@ def setup_client_code(server: ClientServer,
 
 def kill_child_processes(server: ClientServer, timeout: int,
                          logger: Logger) -> bool:
-    logger.debug(f"-  attempting to kill child processes.")
+    logger.debug("-  attempting to kill child processes.")
     kill_cmd = "killall -9 brave; killall Xvfb;"
     rs = run_ssh_cmd(server, kill_cmd, timeout, logger)
     if not rs:

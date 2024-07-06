@@ -6,7 +6,6 @@
 import argparse
 import csv
 import datetime
-import pathlib
 
 import pgcrawl
 from pgcrawl.dispatch import ALL_DIRS, TODO_DIR
@@ -35,14 +34,14 @@ LOGGER = Logger(ARGS.log_level)
 
 mkdirs(ALL_DIRS, ARGS.quiet)
 
-with open(ARGS.filename, 'r') as csvfile:
+with open(ARGS.filename, 'r', encoding="utf8") as csvfile:
     reader = csv.reader(csvfile)
-    index = 1
+    INDEX = 1
     for (rank, domain) in reader:
         file_name = f"{rank}_{domain}"
         dest_file = TODO_DIR / file_name
         dest_file.write_text(str(datetime.datetime.now()))
-        LOGGER.info(f"{index} / {ARGS.num}: Wrote {dest_file}")
-        index += 1
-        if index > ARGS.num:
+        LOGGER.info(f"{INDEX} / {ARGS.num}: Wrote {dest_file}")
+        INDEX += 1
+        if INDEX > ARGS.num:
             break

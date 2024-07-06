@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from datetime import datetime
-from io import StringIO
 import os
 from pathlib import Path
 import signal
@@ -51,6 +50,7 @@ def write_log(dir_path: Path, req: UrlRequest,
 
 def crawl(req: UrlRequest, output_path: Path, binary_path: str,
           pagegraph_time: int, timeout: int, logger: Logger) -> bool:
+    # pylint: disable=consider-using-with,subprocess-popen-preexec-fn
     crawl_args = [
         "npm", "run", "crawl", "--",
         "-b", binary_path,
@@ -61,7 +61,6 @@ def crawl(req: UrlRequest, output_path: Path, binary_path: str,
 
     output_text = ""
     error_text = ""
-    stderr_stream = StringIO()
     is_success = False
     try:
         args_combined = " ".join(crawl_args)
@@ -74,13 +73,13 @@ def crawl(req: UrlRequest, output_path: Path, binary_path: str,
         assert rs.stderr
         output_text = rs.stdout.read().decode("utf8")
         error_text = rs.stderr.read().decode("utf8")
-        is_success = (rs.returncode == 0)
+        is_success = rs.returncode == 0
     except TimeoutExpired:
         output_text = ""
         error_text = "Crawl timed out"
         os.killpg(os.getpgid(rs.pid), signal.SIGTERM)
 
-    logger.debug(f"crawl results:")
+    logger.debug("crawl results:")
     logger.debug(output_text)
 
     if not is_success:
@@ -100,7 +99,7 @@ def crawl(req: UrlRequest, output_path: Path, binary_path: str,
 
 def write_to_s3(req: UrlRequest, graph_path: Path, s3_bucket: str,
                 logger: Logger) -> bool:
-    s3_url = f"s3://brave-research-crawling/{req.graph_name()}"
+    s3_url = f"s3://{s3_bucket}/{req.graph_name()}"
     aws_args = ["aws", "s3", "mv", "--no-progress", str(graph_path), s3_url]
 
     is_success = False
@@ -108,10 +107,11 @@ def write_to_s3(req: UrlRequest, graph_path: Path, s3_bucket: str,
     error_message = ""
     try:
         write_log(AWS_START_DIR, req, " ".join(aws_args))
-        rs = subprocess.run(aws_args, timeout=30, capture_output=True)
+        rs = subprocess.run(aws_args, timeout=30, capture_output=True,
+                            check=False)
         stdout_message = str(rs.stdout)
         error_message = str(rs.stderr)
-        is_success = (rs.returncode == 0)
+        is_success = rs.returncode == 0
     except TimeoutExpired:
         error_message = "request to aws timeout"
 
@@ -136,7 +136,7 @@ def crawl_and_save(req: UrlRequest, output_path: Path, binary_path: str,
     if not crawl_rs:
         return False
 
-    logger.debug(f"3. Writing results to S3")
+    logger.debug("3. Writing results to S3")
     s3_rs = write_to_s3(req, output_path, s3_bucket, logger)
     if not s3_rs:
         return False
@@ -158,6 +158,5 @@ def run(request: UrlRequest, binary_path: str,
     if not rs:
         write_log(ERROR_DIR, request)
         return False
-    else:
-        write_log(COMPLETE_DIR, request)
-        return True
+    write_log(COMPLETE_DIR, request)
+    return True

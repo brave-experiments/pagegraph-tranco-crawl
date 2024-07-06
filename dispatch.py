@@ -3,13 +3,12 @@
 import argparse
 import ipaddress
 import sys
-from typing import Optional
 
 from pgcrawl import DEFAULT_CLIENT_CODE_PATH, NAME
 from pgcrawl.client.args import ClientCrawlArgs, DEFAULT_ARGS
 from pgcrawl.dispatch.commands import Action, client_setup, client_crawl
 from pgcrawl.logging import add_logger_argument, Logger
-from pgcrawl.types import IPAddress, UserName, WorkItem
+from pgcrawl.types import IPAddress, UserName
 
 
 def client_setup_cmd(args: argparse.Namespace, ips: list[IPAddress]) -> None:

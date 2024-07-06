@@ -1,14 +1,14 @@
 from io import StringIO
 
-from fabric import Connection
 from invoke.exceptions import CommandTimedOut
 
-from pgcrawl.logging import Logger, LoggingLevel
+from pgcrawl.logging import Logger
 from pgcrawl.types import ClientServer
 
 
 def run_ssh_cmd(server: ClientServer, cmd: str, timeout: int,
                 logger: Logger) -> bool:
+    # pylint: disable=broad-exception-caught
     conn = server.connection()
     logger.debug(f"*  calling {conn.user}@{conn.host}: {cmd}")
     try:

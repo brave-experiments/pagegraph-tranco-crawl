@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor, Future, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import sys
 import threading
 from typing import Iterable
@@ -28,6 +28,7 @@ class ThreadIPManager:
         self.mapping_dict[thread] = self.ip_addresses[current_index]
 
     def call_on_thread(self, work: WorkItem) -> tuple[IPAddress, bool]:
+        # pylint: disable=broad-exception-caught
         func = work.func
         args = work.args
         thread = threading.current_thread()
@@ -37,7 +38,7 @@ class ThreadIPManager:
         try:
             is_success = func(server_desc, *args, timeout=self.timeout,
                               logger=self.logger)
-        except Exception as e:
+        except Exception:
             is_success = False
         finally:
             server_desc.close()

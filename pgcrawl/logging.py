@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from enum import auto, StrEnum
+from enum import StrEnum
 import sys
 from typing import Any
 
