@@ -90,8 +90,11 @@ def setup_client_code(server: ClientServer,
 def kill_child_processes(server: ClientServer, timeout: int,
                          logger: Logger) -> bool:
     logger.debug("-  attempting to kill child processes.")
-    kill_cmd = "killall -9 brave; killall Xvfb;"
-    rs = run_ssh_cmd(server, kill_cmd, timeout, logger)
+    kill_cmd = [
+        "killall -9 brave || echo no browser processes;"
+        "killall Xvfb; || echo no Xvfb processes;"
+    ]
+    rs = run_ssh_cmd(server, " ".join(kill_cmd), timeout, logger)
     if not rs:
         logger.debug("!  but an error occurred!")
         return False
