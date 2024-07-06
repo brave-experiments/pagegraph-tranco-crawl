@@ -144,11 +144,11 @@ CRAWL_PARSER.add_argument(
     "--client-code-path",
     default=DEFAULT_ARGS.client_code_path,
     help="Path to where this pagegraph-crawl is installed on the client.")
-PARSER.add_argument(
+CRAWL_PARSER.add_argument(
     "--binary-path", "-b",
     default=DEFAULT_ARGS.binary_path,
     help="Path to the PageGraph enabled Brave binary for pagegraph-crawl.")
-PARSER.add_argument(
+CRAWL_PARSER.add_argument(
     "--s3-bucket",
     default=DEFAULT_ARGS.s3_bucket,
     help="The S3 bucket to write the resulting graphs into.")
