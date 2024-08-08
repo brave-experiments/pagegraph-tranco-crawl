@@ -95,7 +95,7 @@ QUERY_PARSER.set_defaults(func=query_cmd)
 try:
     ARGS = PARSER.parse_args()
     LOGGER = Logger(ARGS.log_level)
-    RESULT = ARGS.func(ARGS)
+    RESULT = ARGS.func(ARGS, LOGGER)
 except ValueError as e:
     print(f"Invalid argument: {e}", file=sys.stderr)
     sys.exit(1)
