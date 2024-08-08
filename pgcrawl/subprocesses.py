@@ -1,9 +1,34 @@
 from io import StringIO
+import subprocess
+from typing import Any, Optional
 
 from invoke.exceptions import CommandTimedOut
 
 from pgcrawl.logging import Logger
 from pgcrawl.types import ClientServer
+
+
+def call_output(args: list[str] | str, logger: Logger,
+                **kwargs: Any) -> Optional[str]:
+    logger.debug("Shell: " + str(args))
+    rs = subprocess.run(args, capture_output=True, check=False, **kwargs)
+    logger.debug(rs.stdout)
+    if rs.returncode == 0:
+        return str(rs.stdout)
+    logger.error(rs.stderr)
+    return None
+
+
+def call(args: list[str], logger: Logger, timeout: int = 30,
+         **kwargs: Any) -> bool:
+    logger.debug("Shell: " + " ".join(args))
+    rs = subprocess.run(args, capture_output=True, check=False,
+                        timeout=timeout, **kwargs)
+    logger.debug(rs.stdout)
+    if rs.returncode == 0:
+        return True
+    logger.error(rs.stderr)
+    return False
 
 
 def run_ssh_cmd(server: ClientServer, cmd: str, timeout: int,

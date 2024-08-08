@@ -1,17 +1,22 @@
 from dataclasses import dataclass
 from datetime import datetime
 import os
-from pathlib import Path
 import signal
-import subprocess
 from subprocess import Popen, TimeoutExpired, PIPE
 import urllib.parse
+from typing import Optional, TYPE_CHECKING
 
 from pgcrawl.client import AWS_COMPLETE_DIR, AWS_ERROR_DIR, AWS_START_DIR
 from pgcrawl.client import CRAWLING_COMPLETE_DIR, CRAWLING_ERROR_DIR
 from pgcrawl.client import CRAWLING_START_DIR, PAGEGRAPH_CRAWL_DIR
 from pgcrawl.client import RECEIVED_DIR, TMP_DIR, ERROR_DIR, COMPLETE_DIR
-from pgcrawl.logging import Logger
+from pgcrawl.client import PAGEGRAPH_QUERY_ENV_DIR, PAGEGRAPH_QUERY_PROJECT_DIR
+from pgcrawl.subprocesses import call_output, call
+
+if TYPE_CHECKING:
+    from pathlib import Path
+    from pgcrawl.logging import Logger
+    from pgcrawl.types import Url
 
 
 @dataclass
@@ -38,7 +43,7 @@ class UrlRequest:
         return f"{self.file_name()}.graphml"
 
 
-def write_log(dir_path: Path, req: UrlRequest,
+def write_log(dir_path: "Path", req: UrlRequest,
               msg: None | str = None) -> None:
     if msg:
         text = msg
@@ -48,8 +53,8 @@ def write_log(dir_path: Path, req: UrlRequest,
     dest_path.write_text(text)
 
 
-def crawl(req: UrlRequest, output_path: Path, binary_path: str,
-          pagegraph_time: int, timeout: int, logger: Logger) -> bool:
+def crawl(req: UrlRequest, output_path: "Path", binary_path: str,
+          pagegraph_time: int, timeout: int, logger: "Logger") -> bool:
     # pylint: disable=consider-using-with,subprocess-popen-preexec-fn
     crawl_args = [
         "npm", "run", "crawl", "--",
@@ -97,37 +102,35 @@ def crawl(req: UrlRequest, output_path: Path, binary_path: str,
     return True
 
 
-def write_to_s3(req: UrlRequest, graph_path: Path, s3_bucket: str,
-                logger: Logger) -> bool:
+def get_from_s3(req: UrlRequest, output_path: "Path", s3_bucket: str,
+                logger: "Logger") -> bool:
     s3_url = f"s3://{s3_bucket}/{req.graph_name()}"
-    aws_args = ["aws", "s3", "mv", "--no-progress", str(graph_path), s3_url]
-
-    is_success = False
-    stdout_message = ""
-    error_message = ""
-    try:
-        write_log(AWS_START_DIR, req, " ".join(aws_args))
-        rs = subprocess.run(aws_args, timeout=30, capture_output=True,
-                            check=False)
-        stdout_message = str(rs.stdout)
-        error_message = str(rs.stderr)
-        is_success = rs.returncode == 0
-    except TimeoutExpired:
-        error_message = "request to aws timeout"
-
-    if not is_success:
-        logger.error(error_message)
-        write_log(AWS_ERROR_DIR, req, error_message)
-        return False
-
-    logger.info(stdout_message)
-    write_log(AWS_COMPLETE_DIR, req, stdout_message)
-    return True
+    aws_args = ["aws", "s3", "cp", "--no-progress", s3_url, str(output_path)]
+    return call(aws_args, logger)
 
 
-def crawl_and_save(req: UrlRequest, output_path: Path, binary_path: str,
+def write_to_s3(local_file: "Path", s3_url: "Url", logger: "Logger",
+                timeout: int = 30) -> bool:
+    aws_args = ["aws", "s3", "mv", "--no-progress", str(local_file), s3_url]
+    return call(aws_args, logger, timeout)
+
+
+def write_crawl_results_to_s3(req: UrlRequest, local_file: "Path",
+                              s3_bucket: str, logger: "Logger",
+                              timeout: int = 30) -> bool:
+    s3_url = f"s3://{s3_bucket}/{req.graph_name()}"
+    write_log(AWS_START_DIR, req,
+              f"from: {str(local_file)} -> {s3_url}")
+    if write_to_s3(local_file, s3_url, logger, timeout):
+        write_log(AWS_COMPLETE_DIR, req)
+        return True
+    write_log(AWS_ERROR_DIR, req)
+    return False
+
+
+def crawl_and_save(req: UrlRequest, output_path: "Path", binary_path: str,
                    pagegraph_secs: int, s3_bucket: str, timeout: int,
-                   logger: Logger) -> bool:
+                   logger: "Logger") -> bool:
     logger.debug(f"1. Recording received {req.file_name()}")
 
     logger.debug(f"2. Starting crawl of {req.url} to {str(output_path)}")
@@ -137,16 +140,13 @@ def crawl_and_save(req: UrlRequest, output_path: Path, binary_path: str,
         return False
 
     logger.debug("3. Writing results to S3")
-    s3_rs = write_to_s3(req, output_path, s3_bucket, logger)
-    if not s3_rs:
-        return False
-
-    return True
+    return write_crawl_results_to_s3(req, output_path, s3_bucket,
+                                     logger, timeout)
 
 
-def run(request: UrlRequest, binary_path: str,
-        pagegraph_secs: int, s3_bucket: str, timeout: int,
-        logger: Logger) -> bool:
+def run_crawl(request: UrlRequest, binary_path: str,
+              pagegraph_secs: int, s3_bucket: str, timeout: int,
+              logger: "Logger") -> bool:
     output_path = TMP_DIR / request.graph_name()
     write_log(RECEIVED_DIR, request)
     rs = crawl_and_save(request, output_path, binary_path,
@@ -160,3 +160,66 @@ def run(request: UrlRequest, binary_path: str,
         return False
     write_log(COMPLETE_DIR, request)
     return True
+
+
+def make_pg_query_cmd(command: str) -> str:
+    env_activate_path = PAGEGRAPH_QUERY_ENV_DIR / "bin/activate"
+    source_cmd = "source " + str(env_activate_path)
+
+    run_path = PAGEGRAPH_QUERY_PROJECT_DIR / "run.js"
+    target_command = f"{str(run_path)} {command}"
+
+    complete_cmd = " && ".join([
+        source_cmd,
+        target_command
+    ])
+    return complete_cmd
+
+
+def run_pg_query_cmd(command: str, logger: "Logger") -> Optional[str]:
+    pg_cmd = make_pg_query_cmd(command)
+    return call_output(pg_cmd, logger, shell=True)
+
+
+def run_queries(request: UrlRequest, s3_bucket: str,
+                logger: "Logger") -> dict[str, dict[str, str]] | bool:
+    output_path = TMP_DIR / request.graph_name()
+    graph_path_str = str(output_path)
+
+    try:
+        get_from_s3(request, output_path, s3_bucket, logger)
+
+        frames_rs = run_pg_query_cmd(
+            f"subframes {graph_path_str} -l | jq -r '.[].\"child frames\".[].id'",
+            logger)
+        if frames_rs is None:
+            return False
+
+        frames_nids = frames_rs.split("\n")
+        results = {}
+        for nid in frames_nids:
+            num_requests = run_pg_query_cmd(
+                f"requests -f {nid} {graph_path_str} | jq length", logger)
+            if num_requests is None:
+                return False
+
+            num_js = run_pg_query_cmd(
+                f"js-calls -f {nid} {graph_path_str} | jq '.[].method.name | length'",
+                logger)
+            if num_js is None:
+                return False
+
+            num_html = run_pg_query_cmd(
+                f"html -b -s -f {nid} {graph_path_str} | jq '.[] | length'",
+                logger)
+            if num_html is None:
+                return False
+            results[nid] = {
+                "requests": num_requests,
+                "js": num_js,
+                "html": num_html
+            }
+        return results
+    finally:
+        if output_path.is_file():
+            output_path.unlink()

@@ -12,6 +12,7 @@ from pgcrawl.logging import Logger
 Url = str
 UserName = str
 IPAddress = IPv4Address | IPv6Address
+JSONDict = dict[str, dict[str, str]]
 
 
 @dataclass

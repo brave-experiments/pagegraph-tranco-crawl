@@ -1,11 +1,11 @@
 import pathlib
-import subprocess
-from typing import Any
 
 from pgcrawl.logging import Logger
 from pgcrawl import PG_CRAWL_GIT_URL, BRAVE_INSTALL_SCRIPT
 from pgcrawl.client import PAGEGRAPH_QUERY_ENV_DIR, PAGEGRAPH_QUERY_PROJECT_DIR
 from pgcrawl.client import PAGEGRAPH_CRAWL_DIR
+from pgcrawl.subprocesses import call
+
 
 def mkdirs(dirs: list[pathlib.Path], logger: Logger) -> None:
     logger.debug("Setting up the crawling workspace.")
@@ -15,16 +15,6 @@ def mkdirs(dirs: list[pathlib.Path], logger: Logger) -> None:
             logger.info(f"Created {a_dir}")
         except FileExistsError:
             logger.info(f"Directory {a_dir} already exists")
-
-
-def call(args: list[str], logger: Logger, **kwargs: Any) -> bool:
-    logger.debug("Shell: " + " ".join(args))
-    rs = subprocess.run(args, capture_output=True, check=False, **kwargs)
-    logger.debug(rs.stdout)
-    if rs.returncode == 0:
-        return True
-    logger.error(rs.stderr)
-    return False
 
 
 def check_for_brave_binary(binary_path: str | None,

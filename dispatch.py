@@ -5,7 +5,7 @@ import ipaddress
 import sys
 
 from pgcrawl import DEFAULT_CLIENT_CODE_PATH, NAME
-from pgcrawl.client.args import ClientCrawlArgs, DEFAULT_ARGS
+from pgcrawl.client.args import ClientCrawlArgs, DEFAULT_CRAWL_ARGS
 from pgcrawl.dispatch.commands import Action, client_setup, client_crawl
 from pgcrawl.logging import add_logger_argument, Logger
 from pgcrawl.types import IPAddress, UserName
@@ -32,9 +32,9 @@ def client_setup_cmd(args: argparse.Namespace, ips: list[IPAddress]) -> None:
 
 
 def crawl_cmd(args: argparse.Namespace, ips: list[IPAddress]) -> None:
-    client_crawl_args = ClientCrawlArgs(
-        ARGS.binary_path, ARGS.client_code_path, ARGS.s3_bucket,
-        ARGS.pagegraph_secs, ARGS.client_timeout)
+    client_crawl_args = ClientCrawlArgs(ARGS.client_code_path,
+        ARGS.binary_path, ARGS.s3_bucket, ARGS.pagegraph_secs,
+        ARGS.client_timeout)
     if args.limit != 0 and args.limit < len(ips):
         ips = ips[:args.limit]
     return client_crawl(ips, args.user, args.summarize, args.limit,
@@ -141,30 +141,30 @@ CRAWL_PARSER.add_argument(
     help="Number of URLs to crawl (over all the IP addresses given.) If 0, "
          "then crawl without limit until all URLs are crawled.")
 CRAWL_PARSER.add_argument(
-    "--client-code-path",
-    default=DEFAULT_ARGS.client_code_path,
-    help="Path to where this pagegraph-crawl is installed on the client.")
-CRAWL_PARSER.add_argument(
     "--binary-path", "-b",
-    default=DEFAULT_ARGS.binary_path,
+    default=DEFAULT_CRAWL_ARGS.binary_path,
     help="Path to the PageGraph enabled Brave binary for pagegraph-crawl.")
 CRAWL_PARSER.add_argument(
     "--s3-bucket",
-    default=DEFAULT_ARGS.s3_bucket,
+    default=DEFAULT_CRAWL_ARGS.s3_bucket,
     help="The S3 bucket to write the resulting graphs into.")
 CRAWL_PARSER.add_argument(
     "--pagegraph-secs",
     type=int,
-    default=DEFAULT_ARGS.pagegraph_secs,
+    default=DEFAULT_CRAWL_ARGS.pagegraph_secs,
     help="Number of seconds let the page execute before requesting the graph.")
 CRAWL_PARSER.add_argument(
+    "--client-code-path",
+    default=DEFAULT_CLIENT_CODE_PATH,
+    help="Path to pagegraph-tranco-crawl code on the client.")
+CRAWL_PARSER.add_argument(
     "--client-timeout",
-    default=DEFAULT_ARGS.timeout,
+    default=DEFAULT_CRAWL_ARGS.timeout,
     type=int,
     help="Maximum number of seconds to wait on the client before quitting.")
 CRAWL_PARSER.add_argument(
     "--timeout",
-    default=DEFAULT_ARGS.timeout + 20,
+    default=DEFAULT_CRAWL_ARGS.timeout + 20,
     type=int,
     help="Maximum number of seconds overall to wait before quitting.")
 add_logger_argument(CRAWL_PARSER)
@@ -174,6 +174,26 @@ CRAWL_PARSER.add_argument(
     action="store_true",
     help="Suppress all messages and logging.")
 CRAWL_PARSER.set_defaults(func=crawl_cmd)
+
+QUERY_PARSER = SUBPARSERS.add_parser(
+    "query",
+    help="Query a graph using pagegraph-query.",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+QUERY_PARSER.add_argument(
+    "ip",
+    help="The IP addresses of clients to interact with.",
+    nargs="+")
+QUERY_PARSER.add_argument(
+    "-u", "--user",
+    default="ubuntu",
+    type=UserName,
+    help="The user to use when SSH'ing to a client server.")
+QUERY_PARSER.add_argument(
+    "--limit",
+    default=0,
+    type=int,
+    help="Number of graphs to query (over all the IP addresses given.) If 0, "
+         "then crawl without limit until all graphs are queried.")
 
 try:
     ARGS = PARSER.parse_args()

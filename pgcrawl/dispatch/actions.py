@@ -92,7 +92,9 @@ def kill_child_processes(server: ClientServer, timeout: int,
     logger.debug("-  attempting to kill child processes.")
     kill_cmd = [
         "killall -9 brave || echo no browser processes;"
-        "killall Xvfb; || echo no Xvfb processes;"
+        "killall Xvfb || echo no Xvfb processes;"
+        "rm -Rf /tmp/pagegraph-profile-* || echo no profiles to delete;",
+        "rm -Rf /tmp/.org.chromium.Chromium* || echo no chromium to delete;",
     ]
     rs = run_ssh_cmd(server, " ".join(kill_cmd), timeout, logger)
     if not rs:
@@ -111,11 +113,11 @@ def crawl_with_client_server(server: ClientServer, domain: TrancoDomain,
     crawl_cmd += activate_env_cmd_str(client_code_path)
     crawl_cmd += " && " + " ".join([
         "./client.py",
+        "crawl",
         "--rank", str(domain.rank),
         "--url", domain.url(),
         "--seconds", str(pagegraph_secs),
         "--timeout", str(client_timeout),
-        "--client-code-path", client_code_path,
         "--binary-path", binary_path,
         "--s3-bucket", s3_bucket
     ])

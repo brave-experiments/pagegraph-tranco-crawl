@@ -35,10 +35,12 @@ class ThreadIPManager:
         ip = self.mapping_dict[thread]
         self.logger.info(f"({ip}) -> {work.message}")
         server_desc = ClientServer(ip, self.user)
+        print(work)
         try:
             is_success = func(server_desc, *args, timeout=self.timeout,
                               logger=self.logger)
-        except Exception:
+        except Exception as e:
+            self.logger.error(f"({ip}) -> {e}")
             is_success = False
         finally:
             server_desc.close()
