@@ -1,10 +1,10 @@
 from argparse import ArgumentParser
-from enum import StrEnum
+from enum import Enum
 import sys
 from typing import Any
 
 
-class LoggingLevel(StrEnum):
+class LoggingLevel(Enum):
     DEBUG = "debug"
     INFO = "info"
     ERROR = "error"
