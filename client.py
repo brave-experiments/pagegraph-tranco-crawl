@@ -63,6 +63,10 @@ CLIENT_CRAWL_PARSER.add_argument(
     "--s3-bucket",
     default=DEFAULT_CRAWL_ARGS.s3_bucket,
     help="The S3 bucket to write the resulting graphs into.")
+CLIENT_CRAWL_PARSER.add_argument(
+    "--client-code-path",
+    default=pgcrawl.DEFAULT_CLIENT_CODE_PATH,
+    help="Path to pagegraph-tranco-crawl code on the client.")
 add_logger_argument(CLIENT_CRAWL_PARSER)
 CLIENT_CRAWL_PARSER.set_defaults(func=crawl_cmd)
 
