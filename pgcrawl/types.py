@@ -84,7 +84,7 @@ class TrancoDomain:
         return int(match.group(1)), match.group(2)
 
     def url(self) -> Url:
-        return f"https://{self.domain}"
+        return f"http://{self.domain}"
 
     def move_to_dir(self, new_dir: Path) -> None:
         new_path = new_dir / self.file.name
