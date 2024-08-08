@@ -35,7 +35,6 @@ class ThreadIPManager:
         ip = self.mapping_dict[thread]
         self.logger.info(f"({ip}) -> {work.message}")
         server_desc = ClientServer(ip, self.user)
-        print(work)
         try:
             is_success = func(server_desc, *args, timeout=self.timeout,
                               logger=self.logger)
