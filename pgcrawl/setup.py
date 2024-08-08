@@ -69,7 +69,7 @@ def clone_pagegraph_query(logger: Logger) -> bool:
 
     env_activate_path = PAGEGRAPH_QUERY_ENV_DIR / "bin/activate"
     activate_args = ["source", str(env_activate_path)]
-    if not call(activate_args, logger):
+    if not call(activate_args, logger, shell=True):
         return False
 
     install_args = ["pip3", "install", "-r", "requirements.txt"]
