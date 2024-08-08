@@ -21,7 +21,6 @@ PARSER.add_argument(
     help="The binary to use when checking pagegraph-crawl.")
 ARGS = PARSER.parse_args()
 
-QUIET = ARGS.quiet
 LOGGER = Logger(ARGS.log_level)
 
 PG_CRAWL_SETUP.mkdirs(DIRS_TO_WRITE, LOGGER)
