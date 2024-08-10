@@ -118,7 +118,7 @@ def write_to_s3(local_file: "Path", s3_url: "Url", logger: "Logger",
 def write_crawl_results_to_s3(req: UrlRequest, local_file: "Path",
                               s3_bucket: str, logger: "Logger",
                               timeout: int = 30) -> bool:
-    s3_url = f"s3://{s3_bucket}/{req.graph_name()}"
+    s3_url = f"s3://{s3_bucket}/graphs/{req.graph_name()}"
     write_log(AWS_START_DIR, req,
               f"from: {str(local_file)} -> {s3_url}")
     if write_to_s3(local_file, s3_url, logger, timeout):
