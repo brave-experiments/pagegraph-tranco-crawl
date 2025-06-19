@@ -60,7 +60,7 @@ tomlkit==0.12.5
 tqdm==4.66.4
 twine==5.1.0
 typing_extensions==4.12.2
-urllib3==2.2.2
+urllib3==2.5.0
 wheel==0.43.0
 wrapt==1.16.0
 zipp==3.19.2
