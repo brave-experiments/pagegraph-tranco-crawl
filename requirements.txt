@@ -14,7 +14,7 @@ docutils==0.21.2
 fabric==3.2.2
 idna==3.7
 imagesize==1.4.1
-importlib_metadata==7.2.0
+importlib_metadata==7.2.1
 invocations==3.3.0
 invoke==2.2.0
 isort==5.13.2
