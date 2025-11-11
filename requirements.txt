@@ -16,7 +16,7 @@ idna==3.7
 imagesize==1.4.1
 importlib_metadata==7.2.1
 invocations==3.3.0
-invoke==2.2.0
+invoke==2.2.1
 isort==5.13.2
 jaraco.classes==3.4.0
 jaraco.context==5.3.0
